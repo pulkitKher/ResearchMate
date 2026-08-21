@@ -1,6 +1,6 @@
 from typing import TypedDict,List,Optional
 
-class ResearchState(TypeDict):
+class ResearchState(TypedDict):
     topic: str                      # the user's research query
     search_results: List[dict]      # raw results from Tavily (this round)
     all_findings: List[dict]        # accumulated verified findings across rounds
