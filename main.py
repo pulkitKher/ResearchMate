@@ -7,13 +7,15 @@ def main():
     app = build_graph()
 
     initial_state = {
-        "topic": "the 2027 lunar treaty on left-handed astronauts",
+        "topic": "recent advances in solid-state batteries",
         "search_results": [],
         "all_findings": [],
         "verification_status": "pending",
         "verification_reason": None,
         "retry_count": 0,
         "max_retries": 2,
+        "summary": [],
+        "final_report": "",
     }
 
     print(f"\n{'='*60}")
@@ -33,6 +35,17 @@ def main():
         print(f"{i}. {finding.get('title')}")
         print(f"   {finding.get('url')}")
         print(f"   {finding.get('key_point')}\n")
+
+    print(f"\n{'='*60}")
+    print("SUMMARY (bullet points)")
+    print(f"{'='*60}")
+    for point in final_state.get("summary", []):
+        print(f"- {point}")
+
+    print(f"\n{'='*60}")
+    print("FINAL REPORT (Markdown)")
+    print(f"{'='*60}\n")
+    print(final_state.get("final_report", "No report generated."))
 
 
 if __name__ == "__main__":
