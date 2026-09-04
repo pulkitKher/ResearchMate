@@ -8,3 +8,5 @@ class ResearchState(TypedDict):
     verification_reason: Optional[str]  # why it failed, if it did
     retry_count: int                # how many re-search attempts so far
     max_retries: int                # cap, so we don't loop forever
+    summary: list          # NEW — bullet-point key insights from Summarization Agent
+    final_report: str      # NEW — compiled report from Report Generation Agent
