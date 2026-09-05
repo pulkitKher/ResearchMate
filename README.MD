@@ -1,143 +1,163 @@
-# ResearchMate
+# ResearchMate — AI Based Multi-Agent Research and Report Generation System
 
-**AI-Based Multi-Agent Research and Report Generation System**
+A multi-agent Agentic AI system that automates the research-to-report workflow: gathering information, verifying credibility, synthesizing findings, and generating a structured, cited report — with a self-correcting fact-verification loop that distinguishes it from a single-LLM-call or static-pipeline tool.
 
-ResearchMate is an agentic AI research assistant that uses multiple specialized AI agents — each responsible for a distinct part of the research workflow — instead of relying on a single LLM call to search, verify, summarize, and write. The core differentiator is a **Research Agent → Fact Verification Agent loop** built with LangGraph's conditional routing: when verification fails, the system triggers a targeted re-search using the failure reason as feedback, rather than blindly retrying or returning unverified output.
-
-Minor project (7th Semester) | Team: Pulkit Kher, Shivansh Akar | Mentor: Mr. P.K. Sharma
+**Status:** Phase 2 of 6 complete (as of current build).
 
 ---
 
-## Why this isn't "just a ChatGPT wrapper"
+## 1. Problem Statement
 
-A single LLM call can't judge or retry its own output. ResearchMate has an independent Verification Agent that evaluates Research Agent output and — if it fails — triggers an automatic, *refined* re-search via a conditional edge in the LangGraph state graph. That loop is the concrete, demonstrable proof of "agentic" behavior, not just prompt chaining.
+Researchers and students spend excessive time searching multiple sources, verifying credibility manually, and compiling findings into structured reports. Single-model AI chatbots can summarize text but cannot verify their own output or retry when information is weak or contradictory.
 
----
-
-## Project Status
-
-### ✅ Phase 1 — Research & Verification Core (Complete)
-- LangGraph state graph with conditional re-search loop
-- Research Agent (retrieval-only, Tavily-based)
-- Fact Verification Agent (LLM-judged, structured JSON output)
-- Retry-capped loop with graceful failure handling
-- End-to-end tested on both success and failure paths
-
-### 🔜 Phase 2 — Summarization + Report Generation Agents
-### 🔜 Phase 3 — FastAPI Backend
-### 🔜 Phase 4 — MySQL Integration (phpMyAdmin / cPanel)
-### 🔜 Phase 5 — Frontend (React/Bootstrap) + Google Auth
-### 🔜 Phase 6 — Docker + Deployment (siddharthraje.com)
+ResearchMate addresses this with specialized, collaborating agents — each responsible for one part of the workflow — coordinated through LangGraph, including an independent Fact Verification Agent that can send work back for re-research when it fails quality checks.
 
 ---
 
-## Architecture (Planned — 5 Agents)
+## 2. Team
 
-```
-User Query / Uploaded Document
-        │
-        ▼
- ┌─────────────────┐      fails       ┌───────────────────┐
- │ Research Agent   │ ◄───────────────│ Fact Verification  │
- │ (Tavily search)  │   refined query │ Agent (LLM judge)  │
- └─────────────────┘                  └───────────────────┘
-        │                                      │ passes
-        │                                      ▼
-        │                          ┌───────────────────────┐
-        │                          │ Summarization Agent    │
-        │                          └───────────────────────┘
-        │                                      │
-        │                                      ▼
-        │                          ┌───────────────────────┐
-        │                          │ Report Generation Agent│
-        │                          └───────────────────────┘
-        │                                      │
-        ▼                                      ▼
- ┌─────────────────┐              Structured Report (MySQL)
- │   RAG Agent      │──── cross-checks doc claims vs web ────┘
- │ (FAISS, PDFs)     │
- └─────────────────┘
+| Role | Name |
+|---|---|
+| Faculty Mentor | Mr. P.K. Sharma |
+| Team Member 1 | Pulkit Kher (BTECH/25095/23, 7B) |
+| Team Member 2 | Shivansh Akar (BTECH/25115/23, 7B) |
+
+---
+
+## 3. Architecture Overview
+
+### 3.1 Current Graph (Phase 1 + Phase 2 complete)
+
+```mermaid
+flowchart TD
+    START([START]) --> RESEARCH[Research Agent<br/>Tavily web search]
+    RESEARCH --> VERIFY[Fact Verification Agent<br/>gpt-4o-mini via OpenRouter]
+    VERIFY -->|status: failed AND retries left| INCREMENT[Increment Retry Count]
+    INCREMENT -->|refined query using<br/>verification_reason| RESEARCH
+    VERIFY -->|status: passed OR<br/>max retries reached| SUMMARIZE[Summarization Agent<br/>Dedupe + synthesize key insights]
+    SUMMARIZE --> REPORT[Report Generation Agent<br/>Structured Markdown report]
+    REPORT --> END([END])
+
+    style RESEARCH fill:#4A90D9,color:#fff
+    style VERIFY fill:#E67E22,color:#fff
+    style SUMMARIZE fill:#27AE60,color:#fff
+    style REPORT fill:#8E44AD,color:#fff
+    style INCREMENT fill:#95A5A6,color:#fff
 ```
 
+**The re-search loop (Verify → Increment Retry → Research) is the project's core technical differentiator.** It proves the system is genuinely agentic — capable of judging its own output and autonomously correcting course — rather than a fixed sequential chain of LLM calls.
+
+### 3.2 Planned Full Architecture (all 6 phases)
+
+```mermaid
+flowchart TD
+    USER([User: Topic or Uploaded PDF]) --> ROUTE{Query Type}
+    ROUTE -->|Text topic| RESEARCH[Research Agent]
+    ROUTE -->|Uploaded PDF| RAG[RAG Agent<br/>FAISS vector search<br/>+ literature-review mode]
+
+    RESEARCH --> VERIFY[Fact Verification Agent]
+    VERIFY -->|failed, retries left| RETRY[Increment Retry]
+    RETRY --> RESEARCH
+    VERIFY -->|passed / max retries| SUMMARIZE[Summarization Agent]
+
+    RAG -->|cross-checks doc claims<br/>vs live web findings| VERIFY
+
+    SUMMARIZE --> REPORT[Report Generation Agent<br/>+ Research Gaps section]
+    REPORT --> DB[(MySQL<br/>reports, users, history)]
+    DB --> DASHBOARD[React Dashboard<br/>Google Auth]
+    DASHBOARD --> USER
+
+    style RESEARCH fill:#4A90D9,color:#fff
+    style VERIFY fill:#E67E22,color:#fff
+    style SUMMARIZE fill:#27AE60,color:#fff
+    style REPORT fill:#8E44AD,color:#fff
+    style RAG fill:#C0392B,color:#fff
+    style DB fill:#16A085,color:#fff
+    style DASHBOARD fill:#2C3E50,color:#fff
+```
+
 ---
 
-## Tech Stack
+## 4. Agents
+
+| Agent | File | Responsibility | Status |
+|---|---|---|---|
+| Research Agent | `agents/research_agent.py` | Searches the web via Tavily (`search_depth="advanced"`). Refines query using verification failure reason on retries. | ✅ Done |
+| Fact Verification Agent | `agents/verification_agent.py` | Judges relevance, credibility, and cross-source agreement via gpt-4o-mini. Returns structured JSON. Routes back to Research Agent on failure. | ✅ Done |
+| Summarization Agent | `agents/summarization_agent.py` | Deduplicates and synthesizes verified findings into concise bullet-point insights. Handles empty-findings case gracefully. | ✅ Done |
+| Report Generation Agent | `agents/report_generation_agent.py` | Compiles summary + sources into a structured Markdown report: Introduction, Key Findings, **Research Gaps & Open Questions**, Sources, Conclusion. | ✅ Done |
+| RAG Agent | `agents/rag_agent.py` | Answers questions from user-uploaded PDFs via FAISS. Literature-review mode extracts methodology/dataset/results into comparison tables. Cross-checks document claims against live web findings. | ⏳ Phase 3 |
+
+---
+
+## 5. State Schema (`state.py`)
+
+```python
+class ResearchState(TypedDict):
+    topic: str
+    search_results: list
+    all_findings: list
+    verification_status: str
+    verification_reason: str
+    retry_count: int
+    max_retries: int
+    summary: list          # bullet-point key insights
+    final_report: str      # compiled Markdown report
+```
+
+---
+
+## 6. Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Orchestration | LangGraph |
-| LLM | `openai/gpt-4o-mini` via OpenRouter |
-| Web Search | Tavily |
-| Backend (planned) | FastAPI |
-| Vector Store (planned) | FAISS |
-| Database (planned) | MySQL (phpMyAdmin / cPanel) |
-| Frontend (planned) | React or Bootstrap + Google Auth |
-| Deployment (planned) | Docker |
-| Environment | Windows, Git Bash, Python venv |
+| LLM | GPT-4o-mini via OpenRouter |
+| Web Search | Tavily API |
+| Vector Store | FAISS |
+| Backend | FastAPI |
+| Database | MySQL (phpMyAdmin / cPanel) |
+| Frontend | React |
+| Auth | Google Auth (planned) |
+| Deployment | Docker → AWS EC2 (t2.micro/t3.micro, free tier) + cPanel-hosted MySQL |
+| Dev Environment | Windows, Git Bash, Python venv |
 
 ---
 
-## Project Structure (Phase 1)
+## 7. Six-Phase Build Plan
 
-```
-ResearchMate/
-├── venv/                          # virtual environment (not committed)
-├── agents/
-│   ├── research_agent.py          # retrieval-only node (Tavily)
-│   └── verification_agent.py      # LLM judgment node (structured JSON)
-├── state.py                       # ResearchState TypedDict (shared graph state)
-├── graph.py                       # LangGraph StateGraph + conditional re-search loop
-├── main.py                        # end-to-end runner
-├── .env                           # API keys (not committed)
-├── .gitignore
-└── requirements.txt
-```
+1. ✅ Research Agent + Fact Verification Agent loop (LangGraph) — core differentiator
+2. ✅ Summarization Agent + Report Generation Agent
+3. ⏳ RAG Agent (FAISS) with literature-review mode
+4. ⏳ FastAPI + MySQL backend (incl. API key rotation)
+5. ⏳ React Frontend + Google Auth dashboard
+6. ⏳ Docker + AWS/cPanel deployment
 
 ---
 
-## Setup
+## 8. Special Features (Differentiators)
 
-```bash
-# 1. Create and activate virtual environment
-python -m venv venv
-source venv/Scripts/activate      # Git Bash on Windows
+1. **Automatic re-search loop** — Verification Agent triggers targeted re-search on failure via LangGraph conditional routing (not a static pipeline).
+2. **Research Gap Identification** — Report Generation Agent explicitly surfaces unresolved/underexplored areas, framed honestly (no fabrication when data is insufficient).
+3. **Literature-review mode** *(Phase 3)* — RAG Agent extracts methodology, datasets, and results from uploaded PDFs into comparison tables.
+4. **Document-vs-web contradiction flagging** *(Phase 3)* — RAG Agent cross-checks user-uploaded document claims against live web research.
+5. **Source ranking with justification** *(planned polish)* — small addition to Verification/Report agents explaining why each source matters.
 
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Create .env in project root
-OPENROUTER_API_KEY=your_key_here
-TAVILY_API_KEY=your_key_here
-
-# 4. Run the Phase 1 pipeline
-python main.py
-```
+**Positioning:** framed as a *literature review assistant*, not a generic report generator — a stronger, more defensible pitch requiring no extra technical work.
 
 ---
 
-## How the Re-Search Loop Works
+## 9. Testing Log
 
-1. **Research Agent** searches Tavily for the topic (or a refined query on retry).
-2. **Fact Verification Agent** (`gpt-4o-mini`, `temperature=0`) judges relevance, source credibility, and cross-source agreement, returning structured JSON: `status`, `reason`, `verified_findings`.
-3. **Router** (a conditional edge, not an agent) reads `verification_status`:
-   - `"passed"` → findings are accumulated, graph reaches `END`.
-   - `"failed"` and retries remain → `retry_count` is incremented and the **failure reason is passed back into Research Agent** to refine its next query — not a blind repeat.
-   - `"failed"` and `max_retries` exhausted → graph stops gracefully with an honest `"failed"` status and zero fabricated findings.
-
-### Verified test behavior
-- **Success case:** real topic passed verification on the first attempt, returning 3 structured, cited findings.
-- **Failure case:** a deliberately unanswerable topic failed verification 3 times in a row — each with a distinct, specific reason — with the Research Agent visibly refining its query each retry, before stopping cleanly at the retry cap with 0 fabricated findings.
+| Test | Topic | Result |
+|---|---|---|
+| Phase 1 success path | Real topic | ✅ Findings accumulate correctly |
+| Phase 1 failure path | Nonsense topic | ✅ Fails 3x with distinct reasons, refines query each retry, stops cleanly at max_retries, 0 fabricated findings |
+| Phase 2 success path | "recent advances in solid-state batteries" | ✅ Clean pass, 0 retries, coherent deduplicated summary, well-structured report with genuinely plausible research gaps |
+| Phase 2 failure path | Nonsense topic (with new nodes) | ⏳ Pending |
 
 ---
 
-## Advantages & Disadvantages
+## 10. Why Not Just ChatGPT? (Viva Talking Point)
 
-**Advantages:** self-correcting (not just self-generating), transparent per-decision reasoning, targeted rather than blind retries, bounded execution (no infinite loops), clean separation of concerns between agents, no fabricated output on failure.
-
-**Disadvantages:** retries increase latency/cost, verification quality depends on a single LLM's judgment (not ground-truth fact-checking), a fixed retry cap is a blunt instrument, and results aren't reused/merged across retry rounds.
-
----
-
-## License
-
-Academic project — Bhartiya Institute of Technology, 7th Semester Minor Project.
+A single LLM call cannot verify its own output or autonomously retry itself. ResearchMate's Fact Verification Agent independently judges Research Agent output on relevance, credibility, and cross-source agreement, and triggers an automatic, *targeted* re-search (not a blind repeat) when verification fails — via LangGraph's conditional edge routing. This loop is the structural proof of "agentic" behavior, not just a wrapper around an LLM prompt.

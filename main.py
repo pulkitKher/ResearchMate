@@ -7,7 +7,7 @@ def main():
     app = build_graph()
 
     initial_state = {
-        "topic": "recent advances in solid-state batteries",
+        "topic": "the 2027 lunar treaty on left-handed astronauts",
         "search_results": [],
         "all_findings": [],
         "verification_status": "pending",
