@@ -10,3 +10,9 @@ class ResearchState(TypedDict):
     max_retries: int                # cap, so we don't loop forever
     summary: list          # NEW — bullet-point key insights from Summarization Agent
     final_report: str      # NEW — compiled report from Report Generation Agent
+    # --- RAG / Document path (Phase 3) ---
+    document_path: str          # local path to the uploaded PDF
+    document_chunks: list        # list of dicts: {"text": ..., "page": ..., "chunk_id": ...}
+    doc_question: str            # user's question about the document
+    doc_answer: str               # generated answer
+    doc_citations: list           # list of page numbers / chunk_ids actually used in the answer
