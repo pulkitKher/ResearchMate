@@ -1,21 +1,22 @@
 """
 ingest.py
-Loads a PDF, splits it into overlapping chunks with page metadata,
+Loads a PDF, splits it into overlapping chunks with page + chunk_id metadata,
 embeds them locally (MiniLM), and builds/persists a FAISS index.
 """
 
-import os
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
+
 def load_and_chunk(pdf_path: str):
-    """Load a PDF and split into chunks, preserving page numbers."""
+    """Load a PDF, split into chunks, and tag each chunk with page + chunk_id
+    directly in its metadata (so retrieval never needs a separate lookup)."""
     loader = PyPDFLoader(pdf_path)
-    pages = loader.load()  # one Document per page, page.metadata["page"] = page index (0-based)
+    pages = loader.load()  # one Document per page, page.metadata["page"] = 0-based index
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -24,20 +25,23 @@ def load_and_chunk(pdf_path: str):
 
     chunks = splitter.split_documents(pages)
 
-    # Normalize into our own chunk dict shape (page as 1-based, human-friendly)
     structured_chunks = []
     for i, chunk in enumerate(chunks):
+        chunk.metadata["chunk_id"] = i
+        chunk.metadata["page"] = chunk.metadata.get("page", 0) + 1  # 1-based for humans
+
         structured_chunks.append({
             "chunk_id": i,
-            "page": chunk.metadata.get("page", 0) + 1,
+            "page": chunk.metadata["page"],
             "text": chunk.page_content,
         })
 
-    return structured_chunks, chunks  # return both: our dicts for state, langchain docs for indexing
+    return structured_chunks, chunks  # dicts for state, langchain Documents (with metadata) for indexing
 
 
 def build_faiss_index(chunks_lc_docs, persist_dir: str = "faiss_index"):
-    """Embed chunks with a local model and persist a FAISS index to disk."""
+    """Embed chunks with a local model and persist a FAISS index to disk.
+    metadata (chunk_id, page) travels with each Document automatically."""
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
     vectorstore = FAISS.from_documents(chunks_lc_docs, embeddings)
     vectorstore.save_local(persist_dir)
@@ -51,8 +55,7 @@ def load_faiss_index(persist_dir: str = "faiss_index"):
 
 
 if __name__ == "__main__":
-    # Quick manual test — run this file directly to sanity-check ingestion
-    test_pdf = "sample.pdf"  # put a test PDF at project root with this name
+    test_pdf = "sample.pdf"
     structured, lc_docs = load_and_chunk(test_pdf)
     print(f"Chunked into {len(structured)} pieces. Example:")
     print(structured[0])

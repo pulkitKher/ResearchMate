@@ -35,25 +35,20 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 
 
 def rag_agent_node(state: dict) -> dict:
-    """
-    LangGraph-compatible node. Expects state['doc_question'] and
-    state['document_chunks'] (from ingest.load_and_chunk, already in state
-    or reloaded via FAISS index for retrieval).
-    """
     question = state["doc_question"]
-    all_chunks = state["document_chunks"]  # list of {chunk_id, page, text}
 
     vectorstore = load_faiss_index()
     retrieved_docs = vectorstore.similarity_search(question, k=TOP_K)
 
-    # Map retrieved langchain Documents back to our chunk dicts by matching text
-    # (simplest reliable join given how FAISS.from_documents preserved page_content)
-    retrieved_chunks = []
-    for doc in retrieved_docs:
-        for chunk in all_chunks:
-            if chunk["text"] == doc.page_content:
-                retrieved_chunks.append(chunk)
-                break
+    # metadata now carries chunk_id/page directly — no join needed
+    retrieved_chunks = [
+        {
+            "chunk_id": doc.metadata["chunk_id"],
+            "page": doc.metadata["page"],
+            "text": doc.page_content,
+        }
+        for doc in retrieved_docs
+    ]
 
     excerpts_text = "\n\n".join(
         f"[chunk_id: {c['chunk_id']} | page {c['page']}]\n{c['text']}"
@@ -62,6 +57,7 @@ def rag_agent_node(state: dict) -> dict:
 
     prompt = RAG_PROMPT_TEMPLATE.format(question=question, excerpts=excerpts_text)
     response = llm.invoke(prompt)
+    # ... rest (JSON parsing, cited_pages) stays exactly the same
 
     # Defensive parsing — same pattern as your verification_agent
     try:
