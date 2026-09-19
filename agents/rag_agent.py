@@ -4,15 +4,20 @@ Retrieves relevant chunks for a user's document question and generates
 a grounded answer, citing the page(s) the answer came from.
 """
 
+import os
 import json
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from ingest import load_faiss_index
+
+load_dotenv()
 
 TOP_K = 4
 
 llm = ChatOpenAI(
     model="openai/gpt-4o-mini",
     temperature=0,
+    openai_api_key=os.getenv("OPENROUTER_API_KEY"),
     openai_api_base="https://openrouter.ai/api/v1",
 )
 
@@ -40,7 +45,6 @@ def rag_agent_node(state: dict) -> dict:
     vectorstore = load_faiss_index()
     retrieved_docs = vectorstore.similarity_search(question, k=TOP_K)
 
-    # metadata now carries chunk_id/page directly — no join needed
     retrieved_chunks = [
         {
             "chunk_id": doc.metadata["chunk_id"],
@@ -57,9 +61,7 @@ def rag_agent_node(state: dict) -> dict:
 
     prompt = RAG_PROMPT_TEMPLATE.format(question=question, excerpts=excerpts_text)
     response = llm.invoke(prompt)
-    # ... rest (JSON parsing, cited_pages) stays exactly the same
 
-    # Defensive parsing — same pattern as your verification_agent
     try:
         raw = response.content.strip()
         if raw.startswith("```"):
@@ -71,7 +73,6 @@ def rag_agent_node(state: dict) -> dict:
         answer = "Could not parse a grounded answer from the model response."
         used_ids = []
 
-    # Map used chunk_ids back to page numbers for citation
     cited_pages = sorted({
         c["page"] for c in retrieved_chunks if c["chunk_id"] in used_ids
     })
@@ -79,3 +80,10 @@ def rag_agent_node(state: dict) -> dict:
     state["doc_answer"] = answer
     state["doc_citations"] = cited_pages
     return state
+
+
+if __name__ == "__main__":
+    test_state = {"doc_question": "Who is responsible for maintaining the property?"}
+    result = rag_agent_node(test_state)
+    print("Answer:", result["doc_answer"])
+    print("Cited pages:", result["doc_citations"])
