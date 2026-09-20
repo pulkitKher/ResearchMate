@@ -39,11 +39,14 @@ Respond ONLY in this JSON format, no markdown, no preamble:
 """
 
 
-def rag_agent_node(state: dict) -> dict:
+def rag_agent_node(state: dict, vectorstore=None) -> dict:
     question = state["doc_question"]
 
-    vectorstore = load_faiss_index()
+    if vectorstore is None:
+        vectorstore = load_faiss_index()
+
     retrieved_docs = vectorstore.similarity_search(question, k=TOP_K)
+    # ... rest unchanged
 
     retrieved_chunks = [
         {
@@ -69,13 +72,15 @@ def rag_agent_node(state: dict) -> dict:
         parsed = json.loads(raw)
         answer = parsed.get("answer", "")
         used_ids = parsed.get("used_chunk_ids", [])
+        sufficient = parsed.get("sufficient_context", False)
     except (json.JSONDecodeError, AttributeError):
         answer = "Could not parse a grounded answer from the model response."
         used_ids = []
+        sufficient = False
 
     cited_pages = sorted({
         c["page"] for c in retrieved_chunks if c["chunk_id"] in used_ids
-    })
+    }) if sufficient else []
 
     state["doc_answer"] = answer
     state["doc_citations"] = cited_pages

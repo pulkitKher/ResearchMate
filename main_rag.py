@@ -7,7 +7,7 @@ Ingests a PDF once, then answers repeated questions against it.
 import os
 from ingest import load_and_chunk, build_faiss_index
 from agents.rag_agent import rag_agent_node
-
+from ingest import load_and_chunk, build_faiss_index, load_faiss_index
 
 def ingest_document(pdf_path: str):
     if not os.path.exists(pdf_path):
@@ -24,6 +24,7 @@ def ingest_document(pdf_path: str):
 
 
 def ask_loop():
+    vectorstore = load_faiss_index()  # load once
     print("Document loaded. Ask questions (type 'exit' to quit).\n")
     while True:
         question = input("Q: ").strip()
@@ -33,7 +34,8 @@ def ask_loop():
             continue
 
         state = {"doc_question": question}
-        result = rag_agent_node(state)
+        result = rag_agent_node(state, vectorstore=vectorstore)
+        # ... rest unchanged
 
         print(f"\nA: {result['doc_answer']}")
         if result["doc_citations"]:
