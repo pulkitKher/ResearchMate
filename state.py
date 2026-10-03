@@ -16,3 +16,5 @@ class ResearchState(TypedDict):
     doc_question: str            # user's question about the document
     doc_answer: str               # generated answer
     doc_citations: list           # list of page numbers / chunk_ids actually used in the answer
+    literature_review: dict  # {"methodology": {"value": ..., "citations": [...]}, "dataset": {...}, "results": {...}}
+    contradiction_check: dict  # {"all_results": [...], "contradictions": [...]}
