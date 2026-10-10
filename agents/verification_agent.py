@@ -31,17 +31,27 @@ Topic: {topic}
 Search Results:
 {results}
 """
-
+def _trace_entry(state: ResearchState, status: str, reason: str, passed_count: int) -> list:
+    """Build a one-item list; the reducer concatenates it onto verification_history."""
+    return [{
+        "attempt": state.get("retry_count", 0),
+        "query_used": state.get("last_query", state["topic"]),
+        "status": status,
+        "reason": reason,
+        "passed_count": passed_count,
+    }]
 
 def verify_node(state: ResearchState) -> dict:
     topic = state["topic"]
     results = state["search_results"]
 
     if not results:
+        reason = "No search results were returned at all. Try a broader or rephrased query."
         print("[Verification Agent] No results to verify — auto-fail")
         return {
             "verification_status": "failed",
-            "verification_reason": "No search results were returned at all. Try a broader or rephrased query.",
+            "verification_reason": reason,
+            "verification_history": _trace_entry(state, "failed", reason, 0),
         }
 
     results_text = "\n\n".join(
@@ -61,10 +71,12 @@ def verify_node(state: ResearchState) -> dict:
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
+        reason = "Verification agent output was malformed; retrying search."
         print("[Verification Agent] Failed to parse LLM output as JSON")
         return {
             "verification_status": "failed",
-            "verification_reason": "Verification agent output was malformed; retrying search.",
+            "verification_reason": reason,
+            "verification_history": _trace_entry(state, "failed", reason, 0),
         }
 
     status = parsed.get("status", "failed")
@@ -76,6 +88,9 @@ def verify_node(state: ResearchState) -> dict:
     update = {
         "verification_status": status,
         "verification_reason": reason,
+        "verification_history": _trace_entry(
+            state, status, reason, len(verified_findings) if status == "passed" else 0
+        ),
     }
 
     # Only accumulate findings into all_findings if verification passed

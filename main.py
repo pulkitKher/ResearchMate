@@ -7,7 +7,7 @@ def main():
     app = build_graph()
 
     initial_state = {
-        "topic": "the 2027 lunar treaty on left-handed astronauts",
+        "topic": "xqzvk plorbnax gribblefrotz 2031",
         "search_results": [],
         "all_findings": [],
         "verification_status": "pending",
@@ -16,6 +16,8 @@ def main():
         "max_retries": 2,
         "summary": [],
         "final_report": "",
+        "last_query": "",
+        "verification_history": [],
     }
 
     print(f"\n{'='*60}")
@@ -46,6 +48,14 @@ def main():
     print("FINAL REPORT (Markdown)")
     print(f"{'='*60}\n")
     print(final_state.get("final_report", "No report generated."))
+    print(f"\n{'='*60}")
+    print("VERIFICATION TRACE")
+    print(f"{'='*60}")
+    for e in final_state["verification_history"]:
+        print(f"Attempt {e['attempt']+1} | {e['status']} | passed={e['passed_count']}")
+        print(f"   query:  {e['query_used'][:90]}")
+        print(f"   reason: {e['reason'][:120]}\n")
+    
 
 
 if __name__ == "__main__":

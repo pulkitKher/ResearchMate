@@ -38,4 +38,5 @@ def research_node(state: ResearchState) -> dict:
 
     return {
         "search_results": results,
+        "last_query": query,
     }

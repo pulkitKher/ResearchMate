@@ -1,4 +1,6 @@
 from typing import TypedDict,List,Optional
+import operator
+from typing import TypedDict, List, Optional, Annotated
 
 class ResearchState(TypedDict):
     topic: str                      # the user's research query
@@ -18,3 +20,5 @@ class ResearchState(TypedDict):
     doc_citations: list           # list of page numbers / chunk_ids actually used in the answer
     literature_review: dict  # {"methodology": {"value": ..., "citations": [...]}, "dataset": {...}, "results": {...}}
     contradiction_check: dict  # {"all_results": [...], "contradictions": [...]}
+    last_query :str
+    verification_history: Annotated[list, operator.add]  # one entry per verify pass; accumulates
